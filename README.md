@@ -29,8 +29,8 @@ its folder. With several spaces in the same repo that reads as `herdr`, `herdr`,
 3. its number in the list, the same number the folded rail shows.
 
 The colored avatar keeps the first letter of Herdr's own name for the space (its
-repo or folder), so the color and letter still say where it is. Branch and
-ahead/behind still follow the label where they're unusual, as in the shipped mod.
+repo or folder), so the color and letter still say where it is. No repo or
+branch name is shown; ahead/behind counts still follow the label when not zero.
 
 ## Using it on another machine
 
