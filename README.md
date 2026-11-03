@@ -13,9 +13,8 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `layouts/my-main.json` | The personal clone of Herdr's `main` layout ("Herdr"), the one shown. Its spaces sidebar runs `session-spaces`; its Files panel runs `my-files`. |
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
-| `settings.json`, `keys.json` | Zoom, sounds, keys. In terminals, alt+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e). ctrl+arrows reach the program as the terminal's own sequences, which Vim, bash and Claude Code's prompt treat as word moves; `zshrc` teaches zsh. |
+| `settings.json`, `keys.json` | Zoom, sounds, keys. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
 | `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
-| `zshrc` | zsh's keys for Herdr terminals: ctrl+left and ctrl+right move by a word (`ESC[1;5D` / `ESC[1;5C`, which zsh leaves unbound). `~/.zshrc` sources it. |
 
 ## Space labels
 
@@ -34,7 +33,7 @@ The colored avatar keeps the first letter of Herdr's own name for the space (its
 repo or folder), so the color and letter still say where it is. No repo or
 branch name is shown; ahead/behind counts still follow the label when not zero.
 
-## Vim and the mouse
+## Vim: the mouse and the word keys
 
 Without a vimrc, Vim loads `defaults.vim`, the file that normally turns the
 mouse on, but neither system ends up with it: macOS's `/usr/share/vim/vimrc`
@@ -55,6 +54,16 @@ each machine Herdr opens terminals on (`hc machine ls`), once:
 hc file write --on devbox /home/oleg/.vimrc < ~/.config/herdr-app/vimrc
 ```
 
+Herdr sends alt+arrows and ctrl+arrows to the program as Meta-b and Meta-f
+(`keys.json`), which zsh, bash and Claude Code's prompt take as word moves but
+terminal Vim sees as Esc then b or f. `vimrc` names those byte pairs as two
+spare function keys, `<F35>` and `<F36>`, and maps them to Vim's `<C-Left>` and
+`<C-Right>` in normal, insert and command-line mode. Vim takes the pair as one
+key only when both bytes arrive within `ttimeoutlen` (100 ms), as a key press
+delivers them, so a typed Esc still leaves insert mode. Nothing here is
+shell-specific: there is no zshrc or inputrc to install, and the same vimrc
+goes to every machine.
+
 ## Using it on another machine
 
 Herdr creates `~/.config/herdr-app` on first start, so check the repo out into
@@ -68,7 +77,6 @@ git fetch origin
 git checkout -f master          # overwrites settings.json and keys.json with the tracked ones
 herdr-app do layout.switch '{"name":"my-main"}'
 ln -s ~/.config/herdr-app/vimrc ~/.vimrc   # Vim with the mouse on (skip if you have a vimrc)
-echo 'source ~/.config/herdr-app/zshrc' >> ~/.zshrc   # ctrl+arrows by word in zsh
 ```
 
 The chosen layout is remembered by the app (`shared.json`), so it comes back on
