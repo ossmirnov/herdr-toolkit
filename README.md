@@ -14,7 +14,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
 | `settings.json`, `keys.json` | Zoom, sounds, keys. |
-| `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it. |
+| `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
 
 ## Space labels
 
@@ -35,13 +35,24 @@ branch name is shown; ahead/behind counts still follow the label when not zero.
 
 ## Vim and the mouse
 
-macOS's `/usr/share/vim/vimrc` sets `skip_defaults_vim`, so Vim never loads
-`defaults.vim`, the file that turns the mouse on in xterm-like terminals. With
-no `~/.vimrc`, `:set mouse?` in a Herdr terminal gave `mouse=` and clicks only
-selected terminal text. `vimrc` here sets `mouse=a` and `ttymouse=sgr`; Herdr
-passes mouse events to programs that ask for them, so clicking in Vim moves the
-cursor, dragging selects in Vim and the wheel scrolls the buffer. Hold Shift to
-select terminal text over Vim; right-click still opens Herdr's menu.
+Without a vimrc, Vim loads `defaults.vim`, the file that normally turns the
+mouse on, but neither system ends up with it: macOS's `/usr/share/vim/vimrc`
+sets `skip_defaults_vim` so it never loads, and Ubuntu ships a `defaults.vim`
+with the mouse section removed. Either way `:set mouse?` in a Herdr terminal
+gave `mouse=` and clicks only selected terminal text. `vimrc` here sets
+`mouse=a` and `ttymouse=sgr`, and loads `defaults.vim` itself where the system
+didn't opt out, so Ubuntu keeps its incsearch, wildmenu and scrolloff. Herdr
+passes mouse events to programs that ask for them, local or remote, so clicking
+in Vim moves the cursor, dragging selects in Vim and the wheel scrolls the
+buffer. Hold Shift to select terminal text over Vim; right-click still opens
+Herdr's menu.
+
+Vim on another machine reads that machine's `~/.vimrc`, so copy the file to
+each machine Herdr opens terminals on (`hc machine ls`), once:
+
+```sh
+hc file write --on devbox /home/oleg/.vimrc < ~/.config/herdr-app/vimrc
+```
 
 ## Using it on another machine
 
