@@ -14,6 +14,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
 | `settings.json`, `keys.json` | Zoom, sounds, keys. |
+| `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it. |
 
 ## Space labels
 
@@ -32,6 +33,16 @@ The colored avatar keeps the first letter of Herdr's own name for the space (its
 repo or folder), so the color and letter still say where it is. No repo or
 branch name is shown; ahead/behind counts still follow the label when not zero.
 
+## Vim and the mouse
+
+macOS's `/usr/share/vim/vimrc` sets `skip_defaults_vim`, so Vim never loads
+`defaults.vim`, the file that turns the mouse on in xterm-like terminals. With
+no `~/.vimrc`, `:set mouse?` in a Herdr terminal gave `mouse=` and clicks only
+selected terminal text. `vimrc` here sets `mouse=a` and `ttymouse=sgr`; Herdr
+passes mouse events to programs that ask for them, so clicking in Vim moves the
+cursor, dragging selects in Vim and the wheel scrolls the buffer. Hold Shift to
+select terminal text over Vim; right-click still opens Herdr's menu.
+
 ## Using it on another machine
 
 Herdr creates `~/.config/herdr-app` on first start, so check the repo out into
@@ -44,6 +55,7 @@ git remote add origin git@github.com:ossmirnov/herdr-toolkit.git
 git fetch origin
 git checkout -f master          # overwrites settings.json and keys.json with the tracked ones
 herdr-app do layout.switch '{"name":"my-main"}'
+ln -s ~/.config/herdr-app/vimrc ~/.vimrc   # Vim with the mouse on (skip if you have a vimrc)
 ```
 
 The chosen layout is remembered by the app (`shared.json`), so it comes back on
