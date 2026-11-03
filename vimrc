@@ -24,3 +24,21 @@ if has('mouse')
     set ttymouse=sgr
   endif
 endif
+
+" Herdr sends alt+arrows and ctrl+arrows to the program as Meta-b and Meta-f
+" (keys.json), the word keys zsh, bash and Claude Code's prompt understand.
+" Terminal Vim sees a raw Esc b / Esc f instead. Name those byte pairs as two
+" spare function keys and make them Vim's own word keys in normal, insert and
+" command-line mode. (<M-b> itself would do, but with UTF-8 Vim turns it into
+" the 8-bit character "â" in insert mode.) Vim takes the pair as one key only
+" when both bytes arrive together (ttimeoutlen), as a key press delivers them,
+" so a typed Esc still leaves insert mode as usual.
+if !has('nvim')
+  execute "set <F35>=\eb"
+  execute "set <F36>=\ef"
+  set ttimeout ttimeoutlen=100
+  noremap  <F35> <C-Left>
+  noremap! <F35> <C-Left>
+  noremap  <F36> <C-Right>
+  noremap! <F36> <C-Right>
+endif
