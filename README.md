@@ -13,8 +13,9 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `layouts/my-main.json` | The personal clone of Herdr's `main` layout ("Herdr"), the one shown. Its spaces sidebar runs `session-spaces`; its Files panel runs `my-files`. |
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
-| `settings.json`, `keys.json` | Zoom, sounds, keys. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash, readline and Claude Code's prompt all understand. |
+| `settings.json`, `keys.json` | Zoom, sounds, keys. In terminals, alt+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e). ctrl+arrows reach the program as the terminal's own sequences, which Vim, bash and Claude Code's prompt treat as word moves; `zshrc` teaches zsh. |
 | `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
+| `zshrc` | zsh's keys for Herdr terminals: ctrl+left and ctrl+right move by a word (`ESC[1;5D` / `ESC[1;5C`, which zsh leaves unbound). `~/.zshrc` sources it. |
 
 ## Space labels
 
@@ -67,6 +68,7 @@ git fetch origin
 git checkout -f master          # overwrites settings.json and keys.json with the tracked ones
 herdr-app do layout.switch '{"name":"my-main"}'
 ln -s ~/.config/herdr-app/vimrc ~/.vimrc   # Vim with the mouse on (skip if you have a vimrc)
+echo 'source ~/.config/herdr-app/zshrc' >> ~/.zshrc   # ctrl+arrows by word in zsh
 ```
 
 The chosen layout is remembered by the app (`shared.json`), so it comes back on
