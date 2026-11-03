@@ -12,7 +12,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 |---|---|
 | `layouts/my-main.json` | The personal clone of Herdr's `main` layout ("Herdr"), the one shown. Its spaces sidebar runs `session-spaces`; its Files panel runs `my-files`. |
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
-| `mods/my-files/` | A Files panel with git status colors. A clone of Herdr's `files` mod, work in progress in another session; not tracked yet. |
+| `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
 | `settings.json`, `keys.json` | Zoom, sounds, keys. |
 
 ## Space labels
