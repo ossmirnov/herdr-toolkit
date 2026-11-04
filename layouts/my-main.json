@@ -133,6 +133,13 @@
                       "content": {
                         "mod": "my-files"
                       }
+                    },
+                    {
+                      "id": "pastes",
+                      "type": "block",
+                      "content": {
+                        "mod": "pastes"
+                      }
                     }
                   ],
                   "active": "files"
@@ -176,5 +183,19 @@
   "traffic_lights": [
     12,
     16
+  ],
+  "floating": [
+    {
+      "id": "pastes-hook",
+      "content": {
+        "mod": "pastes",
+        "props": {
+          "role": "hook",
+          "open": true
+        }
+      },
+      "edge": "bottom",
+      "align": "end"
+    }
   ]
 }
