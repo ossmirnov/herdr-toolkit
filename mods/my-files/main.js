@@ -1,5 +1,6 @@
 // A lazy file browser for the focused pane's folder, with git status colors.
-// Click a file: it opens in a new tab of the space, as Cmd-P (open-file) does.
+// Click or double-click a file: it opens in one new tab of the space, as Cmd-P (open-file)
+// does (the second click of a double-click is ignored, so a double-click never opens two).
 // Right-click a file or folder: its path, relative to the folder shown (the
 // focused terminal's cwd), is copied, ready to paste to an agent.
 import { View, div, svg } from "gpui-kit";
@@ -176,7 +177,7 @@ export default class Files extends View {
       const color = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : mark ? t.ansi3 : null;
       const copied = this.copied === path;
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.open(path))
+        .on_click((e, cx) => { if (e.click_count > 1) return; entry.dir ? this.toggle(path, cx) : this.open(path); })
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.copy(path, cx); })
         .child(entry.dir ? svg(`mods/my-files/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(svg(`mods/my-files/${entry.dir ? "folder" : "file"}.svg`).size(14).flex_none().text_color(color ?? t.muted))
