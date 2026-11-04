@@ -42,3 +42,24 @@ if !has('nvim')
   noremap  <F36> <C-Right>
   noremap! <F36> <C-Right>
 endif
+
+" Ctrl+C with text selected copies it to the Mac's clipboard, as in every
+" other Mac app. Vim's own Ctrl+C in Visual mode only ended the selection;
+" Esc still does that. The mapping yanks as usual, then copies the yank where
+" this Vim can reach the Mac's clipboard, decided when the key is pressed, not
+" here: the Mac's system Vim (+clipboard) connects its clipboard after startup,
+" so has('clipboard_working') is 0 while this file loads and 1 afterwards.
+" - A working clipboard: "+ is the macOS pasteboard.
+" - None (devbox's Vim is built without one, and over ssh the clipboard that
+"   matters is the Mac's anyway): write the text to the terminal as an OSC 52
+"   clipboard write. Herdr puts it on the Mac's clipboard, from a remote
+"   terminal too (up to 1 MiB; settings.json's clipboard_write: false blocks it).
+function! s:CopyYank() abort
+  if has('clipboard_working')
+    call setreg('+', @", getregtype('"'))
+  else
+    let b64 = substitute(system('base64', @"), '\n', '', 'g')
+    call echoraw("\e]52;c;" . b64 . "\x07")
+  endif
+endfunction
+vnoremap <silent> <C-c> y:call <SID>CopyYank()<CR>
