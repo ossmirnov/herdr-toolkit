@@ -196,6 +196,14 @@
       },
       "edge": "bottom",
       "align": "end"
+    },
+    {
+      "id": "forward-hook",
+      "content": {
+        "mod": "forward"
+      },
+      "edge": "bottom",
+      "align": "end"
     }
   ]
 }

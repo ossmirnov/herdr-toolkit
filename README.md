@@ -16,6 +16,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `settings.json`, `keys.json` | Zoom, sounds, keys. `cmd-k` is the tab picker (Herdr's `cmd-p`), `cmd-p` opens a file. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
 | `mods/pastes/` | The Pastes panel: everything pasted into a terminal that Claude Code folds into `[Pasted text #1 +N lines]`, shown in full (below). Hooks `cmd-v`. |
 | `mods/open-file/` | `cmd-p`: open a file by path on the space's machine in a new tab, code with syntax colors, markdown rendered, images; `ctrl-,` wraps lines (below). The tab picker moved to `cmd-k`. |
+| `mods/forward/` | Logins on another machine (`aws sso login`, `gcloud auth login`, `codex login`, Claude Code's `/login`) get their browser callback: the port the command listens on there is forwarded from this computer's 127.0.0.1 for as long as the login runs (below). |
 | `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls; Ctrl+C with text selected copies it to the Mac's clipboard, on devbox too. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
 
 ## Space labels
@@ -167,6 +168,51 @@ editor's open-by-path does. The `open-file` mod is one mod with two faces:
   path inside the app home. The copy is replaced when the file changes and
   deleted when the tab closes (`close()`); local images are copied the same
   way so there is one code path. Images over 50 MB are refused.
+
+## Forward: the browser's way back to a login on devbox
+
+`aws sso login` in a devbox space prints a URL and waits. The URL opens here, in
+the Mac's browser; after signing in, AWS sends the browser to
+`http://127.0.0.1:<port>/oauth/callback`, where the command listens for the
+code. But the command runs on devbox, so it listens on devbox's 127.0.0.1, and
+the Mac's 127.0.0.1:<port> has nothing on it: "connection refused". `gcloud auth
+login`, `codex login` and Claude Code's `/login` work the same way, with
+`localhost` instead of `127.0.0.1`. The `forward` mod makes the callback land:
+
+- It watches remote terminals for an authorize URL whose `redirect_uri` names
+  a loopback host and a port (URL-encoded or not; a URL wrapped over several
+  screen lines still counts). Which terminals, and how often: a remote
+  terminal whose program looks like a login (aws, gcloud, az, gh, or a
+  command line saying login, auth, sso, ...) is read once a second while it
+  runs, every three seconds once its port is forwarded; the focused remote
+  terminal is read every three seconds when something other than a shell runs
+  there (an agent that ran the login for you). Local terminals and idle shells
+  are never read, and nothing is read when no remote terminal qualifies.
+- For each port found it opens `ssh -L <port>:localhost:<port> <target>`
+  (the target from `hc machine ls`, so devbox's ProxyJump and keys apply;
+  `BatchMode=yes`, so a key that needs a passphrase fails fast instead of
+  asking) in a core terminal of its own, named `fwd-<machine>-<port>-<id>`
+  with labels `forward.port`, `forward.machine` and `forward.from`. It has
+  no Herdr labels, so no space or tab shows it. The remote end of that ssh
+  checks every second that something still listens on the port (`ss`, else
+  `lsof`) and exits when nothing does, so the tunnel closes by itself once
+  the login is done, or after 15 minutes. Nothing listening to begin with (an
+  old URL still on screen) ends it at once, quietly; the same port isn't tried
+  again for 20 seconds.
+- A toast says "Port <port> forwarded to <machine>" once the tunnel is up,
+  and a pill at the bottom right (a floating block over the layout root,
+  `forward-hook` in `layouts/my-main.json`) lists each tunnel while it lives,
+  with × to close it. A failed tunnel (port taken here, ssh refused) shows
+  the last lines ssh printed in an error toast.
+- `forward.scan` reads the focused terminal now, with 300 lines of history,
+  and forwards what it finds; `forward.stop` closes every tunnel. Neither has a
+  key; `herdr-app do forward.scan` runs one. A machine reached through a
+  command rather than ssh (`hc machine add --via`) can't be forwarded.
+- Quitting Herdr, switching layouts or reloading the mod leaves a tunnel
+  running (it ends with the login); the mod picks live ones up again on
+  start and removes finished ones.
+
+Without it, `aws sso login --use-device-code` avoids the callback altogether.
 
 ## Using it on another machine
 
