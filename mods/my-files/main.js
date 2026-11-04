@@ -5,7 +5,7 @@
 // focused terminal's cwd), is copied, ready to paste to an agent.
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, panes, focused, exec, watchFolder, theme, window, run, shared, setShared } from "herdr";
+import { spaces, panes, focused, exec, watchFolder, theme, window, run, shared, setShared, notify } from "herdr";
 
 function location() {
   const space = spaces().find(s => s.active), f = focused();
@@ -154,11 +154,16 @@ export default class Files extends View {
   // Opens the file in a new tab of the space, exactly as Cmd-P does: the open-file
   // viewer as the tab's only pane, and the file first in Cmd-P's recent list.
   open(path) {
-    const { root, on, space } = this.context;
-    const abs = `${root.replace(/[\\/]$/, "")}/${path}`;
-    const rest = (shared(RECENT) ?? []).filter(r => !(r.path === abs && (r.on ?? null) === (on ?? null)));
-    setShared(RECENT, [{ path: abs, on: on ?? null, at: Date.now() }, ...rest].slice(0, KEEP));
-    run("tab.new", { name: path.slice(path.lastIndexOf("/") + 1), ...(space ? { space } : {}), mod: "open-file", props: { path: abs, on: on ?? null } });
+    try {
+      const { cwd, on, space } = this.context;
+      const abs = `${cwd.replace(/[\\/]$/, "")}/${path}`;
+      const recent = shared(RECENT), rest = (Array.isArray(recent) ? recent : []).filter(r => !(r.path === abs && (r.on ?? null) === (on ?? null)));
+      setShared(RECENT, [{ path: abs, on: on ?? null, at: Date.now() }, ...rest].slice(0, KEEP));
+      run("tab.new", { name: path.slice(path.lastIndexOf("/") + 1), ...(space ? { space } : {}), mod: "open-file", props: { path: abs, on: on ?? null } });
+    } catch (e) {
+      // A click handler's exception is otherwise silent.
+      notify({ title: "Cannot open file", body: String(e?.message ?? e), level: "error" });
+    }
   }
 
   // Copies the path as the tree shows it: relative to the shown folder, no trailing slash.
