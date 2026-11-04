@@ -13,8 +13,9 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `layouts/my-main.json` | The personal clone of Herdr's `main` layout ("Herdr"), the one shown. Its spaces sidebar runs `session-spaces`; its Files panel runs `my-files`. |
 | `mods/session-spaces/` | The spaces sidebar, labelled by session instead of folder (below). A clone of Herdr's `spaces` mod. |
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
-| `settings.json`, `keys.json` | Zoom, sounds, keys. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
+| `settings.json`, `keys.json` | Zoom, sounds, keys. `cmd-k` is the tab picker (Herdr's `cmd-p`), `cmd-p` opens a file. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
 | `mods/pastes/` | The Pastes panel: everything pasted into a terminal that Claude Code folds into `[Pasted text #1 +N lines]`, shown in full (below). Hooks `cmd-v`. |
+| `mods/open-file/` | `cmd-p`: open a file by path on the space's machine in a new tab, code with syntax colors, markdown rendered, images (below). The tab picker moved to `cmd-k`. |
 | `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
 
 ## Space labels
@@ -110,6 +111,46 @@ Since the `terminal` key section beats `layout:<name>`, the `cmd-v` binding
 applies on every layout, but only `my-main` carries the hook: on `main`,
 `terminals` or `win98`, `cmd-v` pastes nothing until the same floating block
 is added to a clone of that layout.
+
+## Open file: `cmd-p`
+
+Herdr binds `cmd-p` to its tab picker; here that is `cmd-k`, and `cmd-p` opens
+a file wherever the focused space lives (devbox or this computer), the way an
+editor's open-by-path does. The `open-file` mod is one mod with two faces:
+
+- **The popup** (`mod.open:open-file`, a popup at the top like the picker's).
+  The chip in the input shows where relative paths start: the machine and the
+  focused terminal's live folder (a mod pane borrows its tab's first terminal).
+  Type `src/main.py`, `../other/x.md`, `/abs/path`, `~/notes.md` or paste
+  `path:42` from an error. As you type, the folder's entries that start with
+  (then contain) the typed name are listed, 500 at most, dotfiles only when
+  the name starts with a dot; `↑`/`↓` pick, `Tab` completes (a folder gets its
+  `/`), `Enter` opens the picked entry (a folder: steps into it), `Esc` leaves.
+  With nothing typed the last five opened files come first, with the machine
+  when it isn't the current one. Enter on a path nothing listed matches asks
+  the machine what it is. The folder listing and the probe are one `sh -c`
+  each, run through `exec` on the space's machine (about 0.2 s to devbox),
+  one listing per folder, not per keystroke. Recent files live in
+  `shared.json` (`open-file.recent`, 30 entries).
+- **The tab** it opens: `tab.new {name: <file name>, space, mod: "open-file",
+  props: {path, on, line?}}`, a new tab of the space named after the file,
+  with the viewer as its only pane (split a shell in beside it like any tab;
+  `cmd-w` closes it). Text shows in Herdr's read-only `Editor` with syntax
+  colors by extension, the same viewer and language table the Files panel's
+  previews use (plus `Makefile`, `Dockerfile`, rc files); `.md` renders with
+  `TextView.markdown`, with a Rendered/Source switch in the header; images
+  (`png jpg jpeg gif webp bmp ico svg`) are fitted to the pane at up to their
+  natural size (SVG scales up), with their pixel size in the header. The header
+  shows the file name, folder, machine, size, the `:line` if one was typed, and
+  `↻`. The file is re-read when it changes: a folder watch on this computer, a
+  `stat` every ten seconds on another machine. Files over 2 MB show their first
+  400k characters; files with NUL bytes say "binary".
+- **Images from another machine** come over as bytes with
+  `hc exec --on <machine> -- cat <path>` (byte-exact; `readTextFile` is text
+  only) into `data/open-file/<hash>-<mtime>.<ext>`, which `image()` reads as a
+  path inside the app home. The copy is replaced when the file changes and
+  deleted when the tab closes (`close()`); local images are copied the same
+  way so there is one code path. Images over 50 MB are refused.
 
 ## Using it on another machine
 
