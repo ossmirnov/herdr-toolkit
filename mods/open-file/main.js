@@ -5,7 +5,7 @@
 // props: {path, on}}`): code with syntax colors in Herdr's read-only editor (the
 // same one the Files panel uses), markdown rendered, images shown, live reload.
 import { View } from "gpui-kit";
-import { props } from "herdr";
+import { props, nextCommand } from "herdr";
 import Ask from "./ask.js";
 import Show from "./view.js";
 
@@ -13,6 +13,8 @@ export default class OpenFile extends View {
   init(_props, cx) {
     this.face = props()?.path ? new Show() : new Ask();
     this.face.init(cx);
+    // Key commands (keys.json "open-file.<command>", e.g. ctrl-, = open-file.wrap).
+    cx.spawn(async (cx) => { for (;;) { const c = await nextCommand(); this.face.command?.(c, cx); } });
   }
 
   render(cx) {

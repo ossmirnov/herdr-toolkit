@@ -15,7 +15,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `mods/my-files/` | The Files panel with git status colors: nested repos found, changed files and the folders holding them colored, the Changes panel dropped. A clone of Herdr's `files` mod. |
 | `settings.json`, `keys.json` | Zoom, sounds, keys. `cmd-k` is the tab picker (Herdr's `cmd-p`), `cmd-p` opens a file. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
 | `mods/pastes/` | The Pastes panel: everything pasted into a terminal that Claude Code folds into `[Pasted text #1 +N lines]`, shown in full (below). Hooks `cmd-v`. |
-| `mods/open-file/` | `cmd-p`: open a file by path on the space's machine in a new tab, code with syntax colors, markdown rendered, images (below). The tab picker moved to `cmd-k`. |
+| `mods/open-file/` | `cmd-p`: open a file by path on the space's machine in a new tab, code with syntax colors, markdown rendered, images; `ctrl-,` wraps lines (below). The tab picker moved to `cmd-k`. |
 | `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
 
 ## Space labels
@@ -141,8 +141,10 @@ editor's open-by-path does. The `open-file` mod is one mod with two faces:
   `TextView.markdown`, with a Rendered/Source switch in the header; images
   (`png jpg jpeg gif webp bmp ico svg`) are fitted to the pane at up to their
   natural size (SVG scales up), with their pixel size in the header. The header
-  shows the file name, folder, machine, size, the `:line` if one was typed, and
-  `↻`. The file is re-read when it changes: a folder watch on this computer, a
+  shows the file name, folder, machine, size, the `:line` if one was typed,
+  Wrap and `↻`. Wrap (or `ctrl-,`, `open-file.wrap` in keys.json) turns line
+  wrapping on or off for every file tab at once (shared `open-file.wrap`; the
+  editor is rebuilt, so it scrolls back to the top). The file is re-read when it changes: a folder watch on this computer, a
   `stat` every ten seconds on another machine. Files over 2 MB show their first
   400k characters; files with NUL bytes say "binary".
 - **Images from another machine** come over as bytes with

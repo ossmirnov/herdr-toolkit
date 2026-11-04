@@ -2,14 +2,17 @@
 // editor with syntax colors (as the Files panel shows previews), markdown rendered
 // (or its source), images fitted to the pane. Images on another machine are copied
 // into data/open-file/ first and dropped when the pane closes. The file is re-read
-// when it changes: a folder watch here, a stat every ten seconds there.
+// when it changes: a folder watch here, a stat every ten seconds there. Line
+// wrapping is one setting for every file tab (shared "open-file.wrap"): the Wrap
+// button, or ctrl-, (keys.json: open-file.wrap).
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView } from "gpui-base";
-import { props, theme, settings, exec, readTextFile, watchFolder, appHome, home, placement } from "herdr";
+import { props, theme, settings, exec, readTextFile, watchFolder, appHome, home, placement, shared, setShared } from "herdr";
 import * as fs from "fs/promises";
 import { STAT, sh, basename, dirname, ext, language, IMAGE, isMarkdown, imageSize, svgSize, bytes, shorten } from "./paths.js";
 
-const TEXT_MAX = 400000, READ_MAX = 2000000, IMAGE_MAX = 50000000, POLL = 10000;
+const TEXT_MAX = 400000, READ_MAX = 2000000, IMAGE_MAX = 50000000, POLL = 10000, WRAP = "open-file.wrap";
+const wrapOn = () => shared(WRAP) === true;
 const hash = (s) => { let h = 5381; for (const c of s) h = ((h * 33) ^ c.codePointAt(0)) >>> 0; return h.toString(16); };
 
 export default class Show {
@@ -19,7 +22,7 @@ export default class Show {
     this.kind = IMAGE.has(ext(this.path)) ? "image" : "text";
     this.state = "loading"; this.stamp = null; this.error = null; this.size = 0;
     this.code = null; this.text = null; this.image = null; this.copy = null;
-    this.source = false; this.box = null; this.busy = false;
+    this.source = false; this.box = null; this.busy = false; this.wrap = wrapOn();
     this.load(cx);
     if (this.on) cx.timer.every(POLL, (cx) => this.check(cx));
     else cx.spawn(async (cx) => {
@@ -99,11 +102,21 @@ export default class Show {
     if (text.includes("\0")) { this.state = "binary"; this.text = null; return; }
     if (text.length > TEXT_MAX) text = text.slice(0, TEXT_MAX) + "\n… (file truncated)";
     this.text = text;
+    this.editor();
+  }
+
+  // A fresh editor over the text, wrapped or not (wrapping is set at creation).
+  editor() {
     this.code?.release();
     const t = theme();
-    this.code = EditorState.new({ language: language(this.path), readonly: true, value: text,
+    this.wrap = wrapOn();
+    this.code = EditorState.new({ language: language(this.path), readonly: true, value: this.text, soft_wrap: this.wrap,
       font_family: settings().font_family, font_size: settings().font_size || 13,
       syntax: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6 } });
+  }
+
+  command(c) {
+    if (c === "wrap") setShared(WRAP, !wrapOn());
   }
 
   async cleanup() {
@@ -151,6 +164,9 @@ export default class Show {
     const t = theme();
     const name = basename(this.path), where = shorten(dirname(this.path), this.on ? null : home());
     const md = isMarkdown(this.path), img = this.image;
+    // Every copy follows the shared setting; a change rebuilds the editor once.
+    if (this.code && this.wrap !== wrapOn()) this.editor();
+    const wrappable = this.kind === "text" && this.state === "ready" && !(md && !this.source);
     const meta = this.kind === "image" && img?.width ? `${img.width} × ${img.height} · ${bytes(this.size)}` : this.state === "ready" ? bytes(this.size) : "";
     // A pane fills it; a floating copy (over a layout) has no size of its own, so it takes one.
     const floating = placement() !== null;
@@ -165,6 +181,7 @@ export default class Show {
         .when(md && this.state === "ready", (el) => el
           .child(this.button(t, "open-file-rendered", "Rendered", !this.source, (cx) => { this.source = false; cx.notify(); }))
           .child(this.button(t, "open-file-source", "Source", this.source, (cx) => { this.source = true; cx.notify(); })))
+        .when(wrappable, (el) => el.child(this.button(t, "open-file-wrap", "Wrap", this.wrap, () => this.command("wrap"))))
         .child(this.button(t, "open-file-reload", "↻", false, (cx) => { this.stamp = null; this.load(cx); })))
       .child(this.body(t));
   }
