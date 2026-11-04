@@ -1,17 +1,22 @@
-// A lazy file browser for the focused pane's folder, with bounded read-only previews.
+// A lazy file browser for the focused pane's folder, with git status colors.
+// Click a file: it opens in a new tab of the space, as Cmd-P (open-file) does.
+// Right-click a file or folder: its path, relative to the folder shown (the
+// focused terminal's cwd), is copied, ready to paste to an agent.
 import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex, Editor, EditorState } from "gpui-base";
-import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, window } from "herdr";
+import { v_flex, h_flex } from "gpui-base";
+import { spaces, panes, focused, exec, watchFolder, theme, window, run, shared, setShared } from "herdr";
 
 function location() {
   const space = spaces().find(s => s.active), f = focused();
   const pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
   const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
-  return { cwd: pane?.cwd || f?.cwd || space?.folder, on, space: space?.id };
+  return { cwd: pane?.cwd || f?.cwd || space?.folder, on, space: space?.id ?? null };
 }
 const key = () => JSON.stringify(location());
-const LANG = { ts: "js", tsx: "js", mts: "js", cts: "js", jsx: "js", mjs: "js", toml: "yaml", jsonc: "json", svelte: "html", vue: "html" };
 const PER_FOLDER = 500, TOTAL = 5000;
+// Cmd-P's recent files (shared with the open-file mod), so files opened here show there too.
+const RECENT = "open-file.recent", KEEP = 30;
+const COPIED_FOR = 1500;
 
 async function directory(path, on) {
   if (!on && window()?.platform === "windows") {
@@ -35,7 +40,6 @@ async function directory(path, on) {
 const GIT_SCRIPT = 'cd "$1" || exit 1; top=$(git rev-parse --show-toplevel 2>/dev/null); '
   + '{ [ -n "$top" ] && echo "$top"; find . -maxdepth 6 \\( -name node_modules -o -name .venv -o -name venv -o -name __pycache__ -o -name target \\) -prune -o -name .git -print -prune 2>/dev/null | head -200 | while read -r g; do d=${g%/.git}; d=${d#.}; echo "$PWD$d"; done; } | sort -u | while read -r r; do '
   + 'printf "R:%s\\0" "$r"; git -C "$r" --no-optional-locks -c core.fsmonitor=false status --porcelain=v1 -z --no-renames --untracked-files=all 2>/dev/null | head -c 2000000; done';
-const RANK = { U: 4, M: 3, D: 2, A: 1 };
 
 async function gitMarks(cwd, on) {
   if (!on && window()?.platform === "windows") return {};
@@ -70,6 +74,7 @@ export default class Files extends View {
   init(_props, cx) {
     this.saved = new Map();
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
+    this.copied = null;
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
   }
@@ -98,14 +103,13 @@ export default class Files extends View {
   }
 
   refresh(cx) {
-    const { cwd, on } = location(), next = key();
+    const { cwd, on, space } = location(), next = key();
     if (next !== this.context?.key) {
-      if (this.context) this.saved.set(this.context.key, { folders: this.folders, file: this.file });
+      if (this.context) this.saved.set(this.context.key, { folders: this.folders });
       const saved = this.saved.get(next);
-      this.context = { key: next, cwd, on }; this.root = cwd; this.on = on; this.entries = new Map(); this.folders = new Set(saved?.folders);
-      this.pending = new Set(); this.marks = {}; this.show(null); this.watched = null; this.error = null; this.limited = false;
+      this.context = { key: next, cwd, on, space }; this.root = cwd; this.on = on; this.entries = new Map(); this.folders = new Set(saved?.folders);
+      this.pending = new Set(); this.marks = {}; this.copied = null; this.watched = null; this.error = null; this.limited = false;
       this.loading = false;
-      if (saved?.file) this.show(saved.file, cx);
     }
     if (!cwd || this.loading) return;
     const context = this.context;
@@ -146,24 +150,22 @@ export default class Files extends View {
     cx.notify();
   }
 
-  show(path, cx) {
-    this.code?.release(); this.code = null; this.file = path; this.fileError = null;
-    if (!path || !cx) return;
-    const context = this.context, root = this.root, on = this.on;
-    cx.spawn(async cx => {
-      try {
-        const text = await readTextFile(`${root}/${path}`, { on });
-        if (this.file !== path || !this.current(context)) return;
-        if (text === null) { this.fileError = "This file is no longer available"; return; }
-        if (text.includes("\0")) { this.fileError = "Binary file · no text preview"; return; }
-        const t = theme(), ext = path.includes(".") ? path.split(".").pop() : "txt";
-        this.code = EditorState.new({ language: LANG[ext] ?? ext, readonly: true,
-          value: text.length > 400000 ? text.slice(0, 400000) + "\n… (file truncated)" : text,
-          font_family: settings().font_family, font_size: 12,
-          syntax: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi1, constant: t.ansi6 } });
-      } catch { if (this.file === path && this.current(context)) this.fileError = "Cannot preview this file (binary, too large, or unreadable)"; }
-      finally { cx.notify(); }
-    });
+  // Opens the file in a new tab of the space, exactly as Cmd-P does: the open-file
+  // viewer as the tab's only pane, and the file first in Cmd-P's recent list.
+  open(path) {
+    const { root, on, space } = this.context;
+    const abs = `${root.replace(/[\\/]$/, "")}/${path}`;
+    const rest = (shared(RECENT) ?? []).filter(r => !(r.path === abs && (r.on ?? null) === (on ?? null)));
+    setShared(RECENT, [{ path: abs, on: on ?? null, at: Date.now() }, ...rest].slice(0, KEEP));
+    run("tab.new", { name: path.slice(path.lastIndexOf("/") + 1), ...(space ? { space } : {}), mod: "open-file", props: { path: abs, on: on ?? null } });
+  }
+
+  // Copies the path as the tree shows it: relative to the shown folder, no trailing slash.
+  copy(path, cx) {
+    cx.write_to_clipboard(path);
+    this.copied = path;
+    cx.notify();
+    cx.timer.after(COPIED_FOR, cx => { if (this.copied === path) { this.copied = null; cx.notify(); } });
   }
 
   rows(prefix, depth, out, t) {
@@ -172,13 +174,16 @@ export default class Files extends View {
       if (out.length >= TOTAL) break;
       const path = prefix ? `${prefix}/${entry.name}` : entry.name, open = this.folders.has(path), mark = this.marks[`${this.root}/${path}`];
       const color = mark === "A" ? t.ansi2 : mark === "D" || mark === "U" ? t.ansi1 : mark ? t.ansi3 : null;
+      const copied = this.copied === path;
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.show(path, cx))
+        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.open(path))
+        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.copy(path, cx); })
         .child(entry.dir ? svg(`mods/my-files/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(svg(`mods/my-files/${entry.dir ? "folder" : "file"}.svg`).size(14).flex_none().text_color(color ?? t.muted))
         .child(div().flex_1().min_w(0).truncate().when(Boolean(color), el => el.text_color(color)).child(entry.name))
-        .when(Boolean(mark) && entry.dir, el => el.child(div().size(6).flex_none().rounded(3).bg(color)))
-        .when(Boolean(mark) && !entry.dir, el => el.child(div().text_size(11).text_color(color).child(mark))));
+        .when(copied, el => el.child(div().flex_none().px(6).h(18).flex().items_center().rounded(5).bg(t.accent).text_size(10.5).text_color(t.accent_foreground).child("Copied")))
+        .when(!copied && Boolean(mark) && entry.dir, el => el.child(div().size(6).flex_none().rounded(3).bg(color)))
+        .when(!copied && Boolean(mark) && !entry.dir, el => el.child(div().text_size(11).text_color(color).child(mark))));
       if (entry.dir && open) this.rows(path, depth + 1, out, t);
     }
     return out;
@@ -189,12 +194,10 @@ export default class Files extends View {
     const t = theme();
     return v_flex().id("files").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-        .when(Boolean(this.file), el => el.child(div().id("files-back").w(20).cursor_pointer().text_color(t.muted).on_click((_e, cx) => { this.show(null); cx.notify(); }).child("←")))
         .child(div().font_semibold().child("Files"))
-        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(this.file ?? this.root?.split(/[\\/]/).pop() ?? "")))
-      .when(!this.file, el => el.child(v_flex().id("files-tree").flex_1().min_h(0).overflow_y_scrollbar().p(6).children(this.rows("", 0, [], t))
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(this.root?.split(/[\\/]/).pop() ?? "")))
+      .child(v_flex().id("files-tree").flex_1().min_h(0).overflow_y_scrollbar().p(6).children(this.rows("", 0, [], t))
         .when(Boolean(this.error) || !this.entries.get("")?.length, el => el.child(div().p(8).text_size(12).text_color(t.dim).child(this.error || (this.loading ? "Loading files…" : this.root ? "No files" : "No folder"))))
-        .when(this.limited, el => el.child(div().p(8).text_size(11).text_color(t.dim).child("File list limited to 500 entries per folder and 5,000 total")))))
-      .when(Boolean(this.file), el => el.child(this.code ? Editor.new(this.code).flex_1().min_h(0) : div().p(12).text_color(t.dim).child(this.fileError || "Loading file…")));
+        .when(this.limited, el => el.child(div().p(8).text_size(11).text_color(t.dim).child("File list limited to 500 entries per folder and 5,000 total"))));
   }
 }
