@@ -16,7 +16,7 @@ files, state, logs. Our own mods and layouts show up as untracked until added.
 | `settings.json`, `keys.json` | Zoom, sounds, keys. `cmd-k` is the tab picker (Herdr's `cmd-p`), `cmd-p` opens a file. In terminals, alt+arrows and ctrl+arrows move by a word and cmd+arrows go to the line's ends: they send the Emacs keys (Meta-b, Meta-f, Ctrl-a, Ctrl-e) that zsh, bash and Claude Code's prompt understand; `vimrc` teaches Vim the two word keys. |
 | `mods/pastes/` | The Pastes panel: everything pasted into a terminal that Claude Code folds into `[Pasted text #1 +N lines]`, shown in full (below). Hooks `cmd-v`. |
 | `mods/open-file/` | `cmd-p`: open a file by path on the space's machine in a new tab, code with syntax colors, markdown rendered, images; `ctrl-,` wraps lines (below). The tab picker moved to `cmd-k`. |
-| `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
+| `vimrc` | Vim's configuration: the mouse on (`mouse=a`, SGR reporting), so a click in Vim moves the cursor, a drag selects and the wheel scrolls; Ctrl+C with text selected copies it to the Mac's clipboard, on devbox too. `~/.vimrc` is a symlink to it here and a copy of it on other machines. |
 
 ## Space labels
 
@@ -35,7 +35,7 @@ The colored avatar keeps the first letter of Herdr's own name for the space (its
 repo or folder), so the color and letter still say where it is. No repo or
 branch name is shown; ahead/behind counts still follow the label when not zero.
 
-## Vim: the mouse and the word keys
+## Vim: the mouse, the word keys and Ctrl+C
 
 Without a vimrc, Vim loads `defaults.vim`, the file that normally turns the
 mouse on, but neither system ends up with it: macOS's `/usr/share/vim/vimrc`
@@ -50,7 +50,8 @@ buffer. Hold Shift to select terminal text over Vim; right-click still opens
 Herdr's menu.
 
 Vim on another machine reads that machine's `~/.vimrc`, so copy the file to
-each machine Herdr opens terminals on (`hc machine ls`), once:
+each machine Herdr opens terminals on (`hc machine ls`), and again after
+editing it:
 
 ```sh
 hc file write --on devbox /home/oleg/.vimrc < ~/.config/herdr-app/vimrc
@@ -65,6 +66,19 @@ key only when both bytes arrive within `ttimeoutlen` (100 ms), as a key press
 delivers them, so a typed Esc still leaves insert mode. Nothing here is
 shell-specific: there is no zshrc or inputrc to install, and the same vimrc
 goes to every machine.
+
+Ctrl+C with text selected copies it to the Mac's clipboard, as in every other
+Mac app (Vim's own Ctrl+C in Visual mode only ended the selection; Esc still
+does). The mapping yanks, then decides where to copy when the key is pressed,
+not when the vimrc loads: the Mac's system Vim connects its clipboard only
+after startup, so `has('clipboard_working')` is 0 while the vimrc runs and 1
+afterwards. With a working clipboard the yank goes into `"+`, the pasteboard.
+Without one (devbox's Vim is built with `-clipboard`, and over ssh the
+clipboard that matters is the Mac's anyway) Vim writes the text to the
+terminal as an OSC 52 clipboard write, `ESC ] 52 ; c ; <base64> BEL`, which
+Herdr puts on the Mac's clipboard from a remote terminal too (up to 1 MiB;
+`clipboard_write: false` in settings.json blocks it, and a terminal that
+ignores OSC 52 copies nothing).
 
 ## Pastes: what Claude Code folded
 
@@ -166,7 +180,7 @@ git remote add origin git@github.com:ossmirnov/herdr-toolkit.git
 git fetch origin
 git checkout -f master          # overwrites settings.json and keys.json with the tracked ones
 herdr-app do layout.switch '{"name":"my-main"}'
-ln -s ~/.config/herdr-app/vimrc ~/.vimrc   # Vim with the mouse on (skip if you have a vimrc)
+ln -s ~/.config/herdr-app/vimrc ~/.vimrc   # Vim with the mouse on and Ctrl+C copying (skip if you have a vimrc)
 ```
 
 The chosen layout is remembered by the app (`shared.json`), so it comes back on
