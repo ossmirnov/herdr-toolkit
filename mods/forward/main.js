@@ -23,7 +23,8 @@
 // saying login, auth, sso, ...), once a second while it runs (every three
 // seconds once its port is forwarded: a retry prints a new one); and the focused
 // remote terminal every three seconds when something other than a shell runs
-// there (an agent running the login for you). Nothing is read otherwise.
+// there (an agent running the login for you). These reads take the screen
+// only, never history, so they never scroll the program. Nothing is read otherwise.
 // `forward.scan` reads the focused terminal now, with its history;
 // `forward.stop` closes every tunnel. Both are mod commands for keys.json or
 // `herdr-app do forward.scan`.
@@ -35,7 +36,11 @@ import { hc, terminals, focused, notify, nextCommand, theme } from "herdr";
 // remote terminal; ms before the same machine:port is tried again.
 const FAST = 1000, SLOW = 3000, RETRY = 20000;
 // Lines of history read above the screen: while watching, and for forward.scan.
-const HISTORY = 20, SCAN_HISTORY = 300;
+// Watching reads the screen only: reading history of a full-screen program
+// (Claude Code's fullscreen TUI) makes hc scroll it and back, which sends the
+// program wheel events and a redraw every read and fights the person's own
+// scrolling. A callback URL being printed is on the screen anyway.
+const HISTORY = 0, SCAN_HISTORY = 300;
 // Seconds a tunnel lives at most.
 const KEEP = 900;
 // A program is a login when its name is one of these, or its command line
